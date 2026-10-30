@@ -1,0 +1,11 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Tests & benchmarks
+.pytest_cache/
+.coverage
+
+# Vendor blobs
+web/vendor/three.min.js
