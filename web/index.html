@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VectorForge // 3D Multi-Tier HNSW Vector Search Hologram & Spatial Routing Cockpit</title>
+  <style>
+    :root {
+      --bg-space: #050811;
+      --bg-panel: rgba(9, 14, 26, 0.88);
+      --bg-panel-hover: rgba(16, 24, 44, 0.94);
+      --bg-panel-border: rgba(0, 243, 255, 0.22);
+      --cyan: #00f3ff;
+      --cyan-glow: rgba(0, 243, 255, 0.45);
+      --emerald: #00ff88;
+      --emerald-glow: rgba(0, 255, 136, 0.45);
+      --amber: #ffaa00;
+      --gold: #ffd700;
+      --gold-glow: rgba(255, 215, 0, 0.5);
+      --violet: #d946ef;
+      --purple: #a855f7;
+      --azure: #0088ff;
+      --crimson: #ff0055;
+      --slate: #94a3b8;
+      --dark-slate: #1e293b;
+      --text: #f8fafc;
+      --font-mono: "JetBrains Mono", "Fira Code", "SF Mono", Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg-space);
+      font-family: var(--font-mono);
+      color: var(--text);
+    }
+
+    #webgl-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    .space-grid {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(0, 243, 255, 0.04) 0%, transparent 75%),
+        linear-gradient(rgba(0, 243, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 243, 255, 0.02) 1px, transparent 1px);
+      background-size: 100% 100%, 48px 48px, 48px 48px;
+    }
+
+    /* Header Bar */
+    header {
+      position: absolute;
+      top: 14px;
+      left: 18px;
+      right: 18px;
+      height: 64px;
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--bg-panel-border);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 10;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--gold), var(--cyan));
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+    }
+
+    .brand-logo svg {
+      width: 24px;
+      height: 24px;
+      fill: none;
+      stroke: #050811;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .brand-title {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #fff;
+    }
+
+    .brand-title span {
+      color: var(--cyan);
+    }
+
+    .brand-sub {
+      font-size: 10px;
+      color: var(--slate);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .header-badges {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--slate);
+    }
+
+    .badge b {
+      color: var(--text);
+    }
+
+    .badge.active {
+      border-color: rgba(0, 255, 136, 0.35);
+      color: var(--emerald);
+      background: rgba(0, 255, 136, 0.08);
+    }
+
+    .badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+      animation: pulse 2s infinite ease-in-out;
+    }
+
+    .badge-dot.offline {
+      background: var(--amber);
+      box-shadow: 0 0 8px var(--amber);
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: 0.6; }
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 8px 14px;
+      border-radius: 7px;
+      border: 1px solid var(--bg-panel-border);
+      background: rgba(0, 243, 255, 0.08);
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background: var(--cyan);
+      color: #050811;
+      box-shadow: 0 0 16px var(--cyan-glow);
+    }
+
+    .btn-gold {
+      background: rgba(255, 215, 0, 0.12);
+      border-color: rgba(255, 215, 0, 0.4);
+      color: var(--gold);
+    }
+
+    .btn-gold:hover {
+      background: var(--gold);
+      color: #050811;
+      box-shadow: 0 0 16px var(--gold-glow);
+    }
+
+    .btn-icon {
+      padding: 8px;
+    }
+
+    /* Side Panels */
+    .panel {
+      position: absolute;
+      top: 90px;
+      bottom: 50px;
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--bg-panel-border);
+      border-radius: 12px;
+      padding: 16px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+    }
+
+    .panel::-webkit-scrollbar {
+      width: 5px;
+    }
+    .panel::-webkit-scrollbar-thumb {
+      background: rgba(0, 243, 255, 0.2);
+      border-radius: 4px;
+    }
+
+    .panel-left {
+      left: 18px;
+      width: 320px;
+    }
+
+    .panel-right {
+      right: 18px;
+      width: 360px;
+    }
+
+    .panel-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(0, 243, 255, 0.15);
+      padding-bottom: 8px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .card-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--slate);
+      font-weight: 600;
+    }
+
+    /* Form Controls */
+    .field-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+    }
+
+    .field-row label {
+      color: var(--slate);
+    }
+
+    .field-row span.val {
+      font-weight: 700;
+      color: var(--cyan);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--dark-slate);
+      outline: none;
+      accent-color: var(--cyan);
+      cursor: pointer;
+    }
+
+    select, input[type="text"] {
+      width: 100%;
+      padding: 8px 10px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(0, 243, 255, 0.25);
+      border-radius: 6px;
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      outline: none;
+    }
+
+    select:focus, input[type="text"]:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan-glow);
+    }
+
+    /* Layer Filters */
+    .layer-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 3px solid var(--slate);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .layer-toggle:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .layer-toggle.l2 { border-left-color: var(--gold); }
+    .layer-toggle.l1 { border-left-color: var(--cyan); }
+    .layer-toggle.l0 { border-left-color: var(--emerald); }
+
+    .layer-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .toggle-checkbox {
+      accent-color: var(--cyan);
+      cursor: pointer;
+    }
+
+    /* Telemetry Counters */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .telemetry-box {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .telemetry-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--slate);
+    }
+
+    .telemetry-val {
+      font-size: 16px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .telemetry-val.emerald { color: var(--emerald); }
+    .telemetry-val.gold { color: var(--gold); }
+    .telemetry-val.cyan { color: var(--cyan); }
+    .telemetry-val.purple { color: var(--purple); }
+
+    /* Trajectory Hop Log */
+    .trajectory-log {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 180px;
+      overflow-y: auto;
+      font-size: 10px;
+    }
+
+    .hop-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 3px solid var(--cyan);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .hop-item:hover {
+      background: rgba(0, 243, 255, 0.1);
+      transform: translateX(2px);
+    }
+
+    .hop-item.entry { border-left-color: var(--gold); background: rgba(255, 215, 0, 0.06); }
+    .hop-item.descent { border-left-color: var(--purple); }
+    .hop-item.beam { border-left-color: var(--emerald); }
+
+    .hop-action {
+      font-weight: 700;
+    }
+
+    .hop-dist {
+      color: var(--slate);
+    }
+
+    /* Top-k Results */
+    .topk-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .topk-card {
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .topk-card:hover {
+      background: var(--bg-panel-hover);
+      border-color: var(--cyan);
+      transform: translateX(3px);
+    }
+
+    .topk-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+    }
+
+    .topk-rank {
+      font-weight: 800;
+      color: var(--gold);
+    }
+
+    .topk-sim {
+      font-weight: 700;
+      color: var(--emerald);
+    }
+
+    .sim-bar-bg {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .sim-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--cyan), var(--emerald));
+      border-radius: 2px;
+      transition: width 0.4s ease;
+    }
+
+    .topk-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 9px;
+      color: var(--slate);
+    }
+
+    .topk-cluster {
+      color: var(--cyan);
+      font-weight: 600;
+    }
+
+    /* Bottom Bar */
+    footer {
+      position: absolute;
+      bottom: 12px;
+      left: 18px;
+      right: 18px;
+      height: 32px;
+      background: var(--bg-panel);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--bg-panel-border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 10px;
+      color: var(--slate);
+      z-index: 10;
+    }
+
+    .footer-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .footer-ticker {
+      color: var(--cyan);
+      font-weight: 600;
+    }
+
+    /* Node Tooltip */
+    #tooltip {
+      position: absolute;
+      padding: 10px 14px;
+      background: rgba(9, 14, 26, 0.94);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--cyan);
+      border-radius: 8px;
+      font-size: 10px;
+      pointer-events: none;
+      display: none;
+      z-index: 100;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.3);
+      max-width: 260px;
+      line-height: 1.5;
+    }
+
+    #tooltip .tt-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--gold);
+      border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+    }
+
+    /* Animation Playback Bar */
+    .playback-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+  </style>
+</head>
+<body>
+  <!-- 3D Scene Background -->
+  <div id="webgl-container"></div>
+  <div class="space-grid"></div>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">VECTOR<span>FORGE</span></div>
+        <div class="brand-sub">3D Multi-Tier HNSW Spatial Routing Cockpit</div>
+      </div>
+    </div>
+
+    <div class="header-badges">
+      <div class="badge active" id="server-badge">
+        <div class="badge-dot" id="server-dot"></div>
+        <span id="server-status-text">CONNECTING</span>
+      </div>
+      <div class="badge">DIM: <b id="hdr-dim">16D</b></div>
+      <div class="badge">METRIC: <b id="hdr-metric">EUCLIDEAN</b></div>
+      <div class="badge">NODES: <b id="hdr-nodes">0</b></div>
+      <div class="badge">EDGES: <b id="hdr-edges">0</b></div>
+      <div class="badge">MAX LAYER: <b id="hdr-maxlevel">L0</b></div>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-gold" id="btn-fire-probe">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        TRIGGER PROBE
+      </button>
+      <button class="btn" id="btn-auto-probe">
+        <span id="auto-probe-text">AUTO-PROBE: OFF</span>
+      </button>
+      <button class="btn btn-icon" id="btn-reset-cam" title="Reset Camera">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      </button>
+      <button class="btn btn-icon" id="btn-toggle-rotate" title="Auto Rotate">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Left Control Panel -->
+  <div class="panel panel-left">
+    <div class="panel-title">
+      <span>Vector Injection & Filters</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+    </div>
+
+    <!-- Query Configuration -->
+    <div class="card">
+      <div class="card-title">Probe Parameters</div>
+      
+      <div class="field-row">
+        <label>Nearest Neighbors (k):</label>
+        <span class="val" id="val-k">5</span>
+      </div>
+      <input type="range" id="input-k" min="1" max="15" value="5">
+
+      <div class="field-row">
+        <label>Beam Width (efSearch):</label>
+        <span class="val" id="val-ef">32</span>
+      </div>
+      <input type="range" id="input-ef" min="8" max="128" step="8" value="32">
+
+      <div class="field-row">
+        <label>Target Cluster Bias:</label>
+      </div>
+      <select id="select-cluster">
+        <option value="any">Any / Random Perturbation</option>
+      </select>
+    </div>
+
+    <!-- Stratified Hierarchy Toggles -->
+    <div class="card">
+      <div class="card-title">Stratified Hierarchy Tiers</div>
+      
+      <div class="layer-toggle l2">
+        <div class="layer-name">
+          <input type="checkbox" class="toggle-checkbox" id="chk-l2" checked>
+          <span>Layer 2+ (Expressway Skips)</span>
+        </div>
+        <span class="val" id="count-l2" style="color:var(--gold);">0</span>
+      </div>
+
+      <div class="layer-toggle l1">
+        <div class="layer-name">
+          <input type="checkbox" class="toggle-checkbox" id="chk-l1" checked>
+          <span>Layer 1 (Highway Mesh)</span>
+        </div>
+        <span class="val" id="count-l1" style="color:var(--cyan);">0</span>
+      </div>
+
+      <div class="layer-toggle l0">
+        <div class="layer-name">
+          <input type="checkbox" class="toggle-checkbox" id="chk-l0" checked>
+          <span>Layer 0 (Dense Ground)</span>
+        </div>
+        <span class="val" id="count-l0" style="color:var(--emerald);">0</span>
+      </div>
+
+      <div class="field-row" style="margin-top:4px;">
+        <label>Vertical Layer Spacing:</label>
+        <span class="val" id="val-spacing">14</span>
+      </div>
+      <input type="range" id="input-spacing" min="6" max="24" value="14">
+      
+      <div class="field-row" style="margin-top:6px;">
+        <label><input type="checkbox" id="chk-guides" checked> Inter-Layer Fiber Guides</label>
+      </div>
+    </div>
+
+    <!-- Camera Presets -->
+    <div class="card">
+      <div class="card-title">Spatial Perspectives</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+        <button class="btn" id="cam-iso">Isometric</button>
+        <button class="btn" id="cam-top">Top-Down</button>
+        <button class="btn" id="cam-side">Side Stratum</button>
+        <button class="btn" id="cam-focus">Focus Top-1</button>
+      </div>
+    </div>
+
+    <!-- Benchmark Card -->
+    <div class="card">
+      <div class="card-title">Systems Benchmark</div>
+      <button class="btn" id="btn-run-benchmark" style="width:100%; justify-content:center;">
+        RUN RECALL@K BENCHMARK
+      </button>
+      <div id="benchmark-result" style="font-size:10px; color:var(--slate); line-height:1.4;"></div>
+    </div>
+  </div>
+
+  <!-- Right Telemetry Panel -->
+  <div class="panel panel-right">
+    <div class="panel-title">
+      <span>Routing Telemetry & Top-k</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    </div>
+
+    <!-- Live Routing Metrics -->
+    <div class="telemetry-grid">
+      <div class="telemetry-box">
+        <span class="telemetry-label">Search Latency</span>
+        <span class="telemetry-val emerald" id="stat-latency">0.00 ms</span>
+      </div>
+      <div class="telemetry-box">
+        <span class="telemetry-label">Dist Evaluations</span>
+        <span class="telemetry-val amber" id="stat-evals">0</span>
+      </div>
+      <div class="telemetry-box">
+        <span class="telemetry-label">Routing Hops</span>
+        <span class="telemetry-val cyan" id="stat-hops">0</span>
+      </div>
+      <div class="telemetry-box">
+        <span class="telemetry-label">Logarithmic Speedup</span>
+        <span class="telemetry-val purple" id="stat-speedup">1.0x</span>
+      </div>
+    </div>
+
+    <!-- Animation Playback Controls -->
+    <div class="card">
+      <div class="card-title">Trajectory Hologram Playback</div>
+      <div class="playback-controls">
+        <button class="btn btn-icon" id="btn-play-pause">
+          <svg id="play-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </button>
+        <button class="btn" id="btn-replay" style="flex:1; justify-content:center;">REPLAY LASER</button>
+        <div style="font-size:10px; color:var(--slate);">Speed: <b id="val-speed" style="color:var(--cyan);">1.0x</b></div>
+      </div>
+    </div>
+
+    <!-- Trajectory Trace Step Log -->
+    <div class="card" style="flex: 1;">
+      <div class="card-title" style="display:flex; justify-content:space-between;">
+        <span>Multi-Layer Trajectory Trace</span>
+        <span id="traj-step-count" style="color:var(--cyan); font-weight:700;">0 steps</span>
+      </div>
+      <div class="trajectory-log" id="trajectory-log">
+        <div style="color:var(--slate); font-style:italic; padding:6px;">No search executed yet. Click TRIGGER PROBE.</div>
+      </div>
+    </div>
+
+    <!-- Top-k Nearest Neighbors -->
+    <div class="card" style="flex: 1.2;">
+      <div class="card-title">
+        <span>Top-k Nearest Neighbors</span>
+      </div>
+      <div class="topk-list" id="topk-list">
+        <div style="color:var(--slate); font-style:italic; padding:6px;">Awaiting query execution...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Bar -->
+  <footer>
+    <div class="footer-left">
+      <span class="footer-ticker">⚡ HNSW LOGARITHMIC ROUTING:</span>
+      <span>Hierarchical skip-graph navigates high-dimensional metric space with O(log N) evaluations</span>
+    </div>
+    <div id="footer-fps">FPS: 60</div>
+  </footer>
+
+  <!-- Node Tooltip -->
+  <div id="tooltip">
+    <div class="tt-title" id="tt-title">Node #0</div>
+    <div id="tt-body"></div>
+  </div>
+
+  <!-- Three.js Offline Assets with CDN Fallback -->
+  <script src="vendor/three.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/three@0.128.0/build/three.min.js'"></script>
+  <script src="vendor/OrbitControls.js" onerror="this.onerror=null;this.src='https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js'"></script>
+
+  <script src="app.js"></script>
+</body>
+</html>
